@@ -1,7 +1,7 @@
 
 const express = require('express');
 const puppeteer = require('puppeteer-core');
-const { executablePath } = require('puppeteer');
+const { executablePath } = puppeteer;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
