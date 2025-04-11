@@ -1,39 +1,41 @@
 const express = require('express');
-const puppeteer = require('puppeteer-core');
-const chromium = require('@sparticuz/chromium');
+const puppeteer = require('puppeteer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/scrape', async (req, res) => {
-    const url = req.query.url;
-    if (!url) return res.status(400).send('Missing ?url=');
+  const url = req.query.url;
+  if (!url) return res.status(400).send('Missing ?url=');
 
-    try {
-        const browser = await puppeteer.launch({
-            executablePath: await chromium.executablePath(),
-            args: chromium.args,
-            headless: chromium.headless,
-            defaultViewport: chromium.defaultViewport,
-        });
+  try {
+    console.log('Launching browser...');
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
 
-        const page = await browser.newPage();
-        await page.goto(url, { waitUntil: 'networkidle2' });
+    const page = await browser.newPage();
+    console.log('Navigating to', url);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
 
-        const data = await page.evaluate(() => {
-            return {
-                titre: document.querySelector('h1')?.innerText,
-                description: document.querySelector('.job-offer__details')?.innerText,
-            };
-        });
+    const data = await page.evaluate(() => {
+      return {
+        titre: document.querySelector('h1')?.innerText || 'Titre non trouvé',
+        description: document.querySelector('p')?.innerText || 'Description non trouvée',
+      };
+    });
 
-        await browser.close();
-        res.json(data);
-    } catch (err) {
-        res.status(500).json({ error: err.toString() });
-    }
+    await browser.close();
+    console.log('Scraping terminé');
+
+    res.json(data);
+  } catch (err) {
+    console.error('Erreur scraping:', err);
+    res.status(500).json({ error: err.toString() });
+  }
 });
 
 app.listen(PORT, () => {
-    console.log(`✅ Server listening on ${PORT}`);
+  console.log(`✅ Puppeteer API running on http://localhost:${PORT}`);
 });
