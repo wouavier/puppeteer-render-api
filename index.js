@@ -1,7 +1,6 @@
-
 const express = require('express');
 const puppeteer = require('puppeteer-core');
-const { executablePath } = puppeteer;
+const chromium = require('@sparticuz/chromium');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,9 +10,10 @@ app.get('/scrape', async (req, res) => {
   if (!url) return res.status(400).send('Missing ?url=...');
 
   const browser = await puppeteer.launch({
-    headless: 'new',
-    executablePath: executablePath(),
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
   });
 
   const page = await browser.newPage();
@@ -21,7 +21,7 @@ app.get('/scrape', async (req, res) => {
 
   const data = await page.evaluate(() => ({
     titre: document.querySelector('h1')?.innerText,
-    contenu: document.querySelector('.job-offer__details')?.innerText
+    contenu: document.querySelector('.job-offer__details')?.innerText,
   }));
 
   await browser.close();
