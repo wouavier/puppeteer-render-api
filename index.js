@@ -5,39 +5,14 @@ const chromium = require('@sparticuz/chromium');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Fonction générique pour parser selon le domaine
-const parseOffer = async (page, url) => {
-    const hostname = new URL(url).hostname;
-
-    if (hostname.includes('apec.fr')) {
-        return await page.evaluate(() => {
-            return {
-                titre: document.querySelector('h1')?.innerText || '',
-                entreprise: document.querySelector('[class*="societe"]')?.innerText || '',
-                lieu: document.querySelector('[class*="lieu"]')?.innerText || '',
-                typeContrat: document.querySelector('[class*="contrat"]')?.innerText || '',
-                salaire: document.querySelector('[class*="salaire"]')?.innerText || '',
-                datePublication: document.querySelector('[class*="date"]')?.innerText || '',
-                description: document.querySelector('[class*="job-offer__details"]')?.innerText || '',
-                url: window.location.href,
-            };
-        });
-    }
-
-    // Exemple de fallback générique (à personnaliser)
-    return {
-        titre: await page.title(),
-        url: url,
-        note: 'Pas de parser spécifique pour ce site.',
-    };
-};
-
 app.get('/scrape', async (req, res) => {
     const url = req.query.url;
     if (!url) return res.status(400).json({ error: 'Missing ?url=' });
 
+    let browser;
+
     try {
-        const browser = await puppeteer.launch({
+        browser = await puppeteer.launch({
             executablePath: await chromium.executablePath(),
             args: chromium.args,
             headless: chromium.headless,
@@ -46,33 +21,36 @@ app.get('/scrape', async (req, res) => {
 
         const page = await browser.newPage();
 
-        // Optionnel : cookies à injecter
-        if (req.query.cookieName && req.query.cookieValue) {
-            await page.setCookie({
-                name: req.query.cookieName,
-                value: req.query.cookieValue,
-                domain: new URL(url).hostname,
-            });
-        }
+        // Navigation vers l’URL
+        await page.goto(url, { waitUntil: 'networkidle2' });
 
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+        // Récupération du texte visible de la page
+        const fullText = await page.evaluate(() => document.body.innerText || '');
 
-        const data = await parseOffer(page, url);
+        // Récupération des cookies
         const cookies = await page.cookies();
 
-        await browser.close();
+        const pageTitle = await page.title();
 
         res.json({
             success: true,
-            parsedData: data,
-            cookies: cookies,
+            parsedData: {
+                title: pageTitle,
+                url,
+                fullText,
+                note: "Pas de parser spécifique pour ce site."
+            },
+            cookies,
         });
 
     } catch (err) {
-        res.status(500).json({ error: err.toString() });
+        console.error('Scraping error:', err);
+        res.status(500).json({ success: false, error: err.toString() });
+    } finally {
+        if (browser) await browser.close();
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`✅ Puppeteer API running on port ${PORT}`);
+    console.log(`✅ Server listening on port ${PORT}`);
 });
