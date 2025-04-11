@@ -1,5 +1,6 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,33 +10,33 @@ app.get('/scrape', async (req, res) => {
   if (!url) return res.status(400).send('Missing ?url=');
 
   try {
-    console.log('Launching browser...');
     const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath: await chromium.executablePath(),
+      args: chromium.args,
+      headless: chromium.headless,
+      defaultViewport: chromium.defaultViewport,
     });
 
     const page = await browser.newPage();
-    console.log('Navigating to', url);
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
-    const data = await page.evaluate(() => {
-      return {
-        titre: document.querySelector('h1')?.innerText || 'Titre non trouvé',
-        description: document.querySelector('p')?.innerText || 'Description non trouvée',
-      };
-    });
+    const data = await page.evaluate(() => ({
+      titre: document.querySelector('h1')?.innerText || null,
+      description: document.querySelector('p, .description, .job-offer__details')?.innerText || null
+    }));
 
     await browser.close();
-    console.log('Scraping terminé');
-
     res.json(data);
   } catch (err) {
-    console.error('Erreur scraping:', err);
+    console.error('❌ Scraping failed:', err);
     res.status(500).json({ error: err.toString() });
   }
 });
 
+app.get('/', (req, res) => {
+  res.send('✅ Puppeteer API is running');
+});
+
 app.listen(PORT, () => {
-  console.log(`✅ Puppeteer API running on http://localhost:${PORT}`);
+  console.log(`🚀 Server listening on port ${PORT}`);
 });
