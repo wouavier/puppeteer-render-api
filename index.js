@@ -1,56 +1,61 @@
+// 🧠 index.js complet pour usage Puppeteer dans N8N
 const express = require('express');
 const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
+const cookie = require('cookie');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Pour activer CORS si besoin
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  next();
+});
+
 app.get('/scrape', async (req, res) => {
-    const url = req.query.url;
-    if (!url) return res.status(400).json({ error: 'Missing ?url=' });
+  const url = req.query.url;
+  if (!url) return res.status(400).json({ error: 'Missing ?url=' });
 
-    let browser;
+  try {
+    const browser = await puppeteer.launch({
+      executablePath: await chromium.executablePath(),
+      args: chromium.args,
+      headless: chromium.headless,
+      defaultViewport: chromium.defaultViewport,
+    });
 
-    try {
-        browser = await puppeteer.launch({
-            executablePath: await chromium.executablePath(),
-            args: chromium.args,
-            headless: chromium.headless,
-            defaultViewport: chromium.defaultViewport,
-        });
+    const page = await browser.newPage();
 
-        const page = await browser.newPage();
+    // Extraire automatiquement les cookies s'ils sont nécessaires (ex: Apec)
+    const cookies = await page.cookies(url);
 
-        // Navigation vers l’URL
-        await page.goto(url, { waitUntil: 'networkidle2' });
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    const fullText = await page.evaluate(() => document.body.innerText);
 
-        // Récupération du texte visible de la page
-        const fullText = await page.evaluate(() => document.body.innerText || '');
+    const title = await page.title();
+    const canonical = await page.evaluate(() => {
+      const link = document.querySelector("link[rel='canonical']");
+      return link ? link.href : window.location.href;
+    });
 
-        // Récupération des cookies
-        const cookies = await page.cookies();
+    await browser.close();
 
-        const pageTitle = await page.title();
-
-        res.json({
-            success: true,
-            parsedData: {
-                title: pageTitle,
-                url,
-                fullText,
-                note: "Pas de parser spécifique pour ce site."
-            },
-            cookies,
-        });
-
-    } catch (err) {
-        console.error('Scraping error:', err);
-        res.status(500).json({ success: false, error: err.toString() });
-    } finally {
-        if (browser) await browser.close();
-    }
+    res.json({
+      success: true,
+      parsedData: {
+        titre: title,
+        url: canonical,
+      },
+      rawText: fullText,
+      cookies
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.toString() });
+  }
 });
 
 app.listen(PORT, () => {
-    console.log(`✅ Server listening on port ${PORT}`);
+  console.log(`🚀 Puppeteer server running on port ${PORT}`);
 });
