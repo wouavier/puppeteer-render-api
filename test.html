@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Test de scraping avec Puppeteer</title>
+</head>
+<body>
+  <h1>Test de scraping avec Puppeteer</h1>
+  <label>Lien à scraper : <input id="url" value="https://www.wikipedia.org/" size="80" /></label>
+  <button onclick="scrape()">Scraper</button>
+  <pre id="output">Chargement...</pre>
+
+  <script>
+    async function scrape() {
+      const url = document.getElementById('url').value;
+      const output = document.getElementById('output');
+      output.textContent = 'Chargement...';
+      try {
+        const response = await fetch('https://puppeteer-api-fu6i.onrender.com/scrape?url=' + encodeURIComponent(url));
+        const data = await response.json();
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        output.textContent = 'Erreur : ' + e.message;
+      }
+    }
+  </script>
+</body>
+</html>
