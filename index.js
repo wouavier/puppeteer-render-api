@@ -1,4 +1,4 @@
-// 🧠 index.js complet pour usage Puppeteer dans N8N
+// 🧠 index.js complet pour usage Puppeteer dans N8N + Optimisations anti-bot
 const express = require('express');
 const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
@@ -28,12 +28,23 @@ app.get('/scrape', async (req, res) => {
 
     const page = await browser.newPage();
 
-    // Extraire automatiquement les cookies s'ils sont nécessaires (ex: Apec)
+    // 🧠 Améliorations pour contourner les protections anti-bot
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0 Safari/537.36'
+    );
+    await page.setViewport({ width: 1366, height: 768 });
+
+    // Cookies préliminaires (ex : Apec)
     const cookies = await page.cookies(url);
 
+    // Chargement de la page
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-    const fullText = await page.evaluate(() => document.body.innerText);
 
+    // Pause + scroll simulé
+    await page.waitForTimeout(2000);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+    const fullText = await page.evaluate(() => document.body.innerText);
     const title = await page.title();
     const canonical = await page.evaluate(() => {
       const link = document.querySelector("link[rel='canonical']");
