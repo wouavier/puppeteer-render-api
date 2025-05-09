@@ -67,6 +67,6 @@ app.get('/scrape', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Puppeteer server running on port ${PORT}`);
 });
